@@ -20,3 +20,7 @@ When writing inputs/outputs:
 - Make sure you use the functions `write_input_file` and `write_output_file` provided
 - Run the functions `read_input_file` and `read_output_file` to validate your files before submitting!
   - These are the functions run by the autograder to validate submissions
+
+
+https://docs.google.com/document/d/1t239a30Y7fyx972lfCSCRv4xC_keaA5osfceB22YKQw/edit?ts=5fb1710d
+
