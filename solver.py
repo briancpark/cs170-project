@@ -4,6 +4,8 @@ from utils import is_valid_solution, calculate_happiness
 import sys
 
 
+
+
 def solve(G, s):
     """
     Args:
@@ -16,6 +18,122 @@ def solve(G, s):
 
     # TODO: your code here!
     pass
+
+def brute_force_solve(G, s):
+    """
+    Main idea: We go through all possible numbers of breakout rooms (1→ n). For each number of breakout rooms, we try every possible permutation of students. We calculate the amount of stress for each one of these methods. If it is below the threshold limit set based on the number of breakout rooms, then we count it as a valid solution. We then compare all valid solutions and pick the solution with the largest happiness value.
+
+    """
+    num_students = G.number_of_nodes()
+    # happiness & stress is a dictionary where key is tuple and the corresponding value is the stress
+    # for example {(0, 1): 9.2, (0, 2): 5.4, (0, 3): 2.123, (1, 2): 75.4, (1, 3): 18.0, (2, 3): 87.0}
+    # the tuple respresents the edge.
+    happiness = nx.get_edge_attributes(G,'happiness')
+    stress = nx.get_edge_attributes(G,'stress')
+    
+    for breakout_room in range(1, num_students): #Breakout rooms 1 -> n
+        for group in range(breakout_room): #Go through each breakout room
+            for edge in G.edges: # 
+                
+                # Total accumulated stress should not exceed s / k here
+                if  < s:
+
+                happiness[edge] = 
+                stress[edge] =
+
+
+
+    return None #Supposed to reutrn D, k
+
+
+
+# For 4 people
+    # One big breakout rooms.
+        # [[1,2,3,4]] 
+
+    # Two breakout rooms.
+        # [[1,2][3,4]] 
+        # [[1,3][2,4]]
+        # [[1,4],[2,3]]
+        ##############
+        # [[1][2,3,4]]  [[2,3,4][1]]
+        # [[2][1,3,4]]  [[1,3,4][2]]
+        # [[3][1,2,4]]  [[1,2,4][3]]
+        # [[4][1,2,3]]  [[1,2,3][4]]
+        ##############
+
+    # Three breakout rooms.
+        # [[1][2][3,4]]
+        # [[1][3][2,4]]
+        # [[1][4][2,3]]
+        # [[2][3][1,4]]
+        # [[2][3][1,4]]
+        
+
+    # Four breakout rooms.
+        # [[1][2][3][4]]
+
+# From https://github.com/networkx/networkx/blob/master/networkx/algorithms/clique.py
+def enumerate_all_cliques(G):
+    """Returns all cliques in an undirected graph.
+    This function returns an iterator over cliques, each of which is a
+    list of nodes. The iteration is ordered by cardinality of the
+    cliques: first all cliques of size one, then all cliques of size
+    two, etc.
+    Parameters
+    ----------
+    G : NetworkX graph
+        An undirected graph.
+    Returns
+    -------
+    iterator
+        An iterator over cliques, each of which is a list of nodes in
+        `G`. The cliques are ordered according to size.
+    Notes
+    -----
+    To obtain a list of all cliques, use
+    `list(enumerate_all_cliques(G))`. However, be aware that in the
+    worst-case, the length of this list can be exponential in the number
+    of nodes in the graph (for example, when the graph is the complete
+    graph). This function avoids storing all cliques in memory by only
+    keeping current candidate node lists in memory during its search.
+    The implementation is adapted from the algorithm by Zhang, et
+    al. (2005) [1]_ to output all cliques discovered.
+    This algorithm ignores self-loops and parallel edges, since cliques
+    are not conventionally defined with such edges.
+    References
+    ----------
+    .. [1] Yun Zhang, Abu-Khzam, F.N., Baldwin, N.E., Chesler, E.J.,
+           Langston, M.A., Samatova, N.F.,
+           "Genome-Scale Computational Approaches to Memory-Intensive
+           Applications in Systems Biology".
+           *Supercomputing*, 2005. Proceedings of the ACM/IEEE SC 2005
+           Conference, pp. 12, 12--18 Nov. 2005.
+           <https://doi.org/10.1109/SC.2005.29>.
+    """
+    index = {}
+    nbrs = {}
+    for u in G:
+        index[u] = len(index)
+        # Neighbors of u that appear after u in the iteration order of G.
+        nbrs[u] = {v for v in G[u] if v not in index}
+
+    queue = deque(([u], sorted(nbrs[u], key=index.__getitem__)) for u in G)
+    # Loop invariants:
+    # 1. len(base) is nondecreasing.
+    # 2. (base + cnbrs) is sorted with respect to the iteration order of G.
+    # 3. cnbrs is a set of common neighbors of nodes in base.
+    while queue:
+        base, cnbrs = map(list, queue.popleft())
+        yield base
+        for i, u in enumerate(cnbrs):
+            # Use generators to reduce memory consumption.
+            queue.append(
+                (
+                    chain(base, [u]),
+                    filter(nbrs[u].__contains__, islice(cnbrs, i + 1, None)),
+                )
+            )
 
 
 # Here's an example of how to run your solver.
