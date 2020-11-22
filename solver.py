@@ -36,10 +36,10 @@ def brute_force_solve(G, s):
             for edge in G.edges: # 
                 
                 # Total accumulated stress should not exceed s / k here
-                if  < s:
+                if 0 < s:
 
-                happiness[edge] = 
-                stress[edge] =
+                    happiness[edge] = 0
+                    stress[edge] =0
 
 
 
