@@ -48,6 +48,12 @@ def greedyVersion(G, s):
     return None
 
 
+def scrambled(orig):
+    dest = orig[:]
+    random.shuffle(dest)
+    return dest
+
+
 def greedy2(G, s):
     """
         check to see which two breakouts we can combine without exceeding the stress threshhold
@@ -75,9 +81,16 @@ def greedy2(G, s):
         is_merge = False
         # First room
         ################
-        for br1 in random.shuffle(list(d.keys())):
+        # Generate a random number in 1-length
+        d_temp1 = d.key()
+        d_temp2 = d.key()
+
+        d_temp1 = scrambled(d_temp1)
+        d_temp2 = scrambled(d_temp2)
+
+        for br1 in d_temp1:
             # Second room
-            for br2 in random.shuffle(list(d.keys())):
+            for br2 in d_temp2:
                 # Two rooms have to be different
                 if (d[br1] != d[br2]):
                     # Check to see if merge is possible.
@@ -111,7 +124,7 @@ def greedy2(G, s):
 
     for room in d.values():
         for i in room:
-            d_student_rooms[i] = room_i    
+            d_student_rooms[i] = room_i
         room_i += 1
 
     return d_student_rooms, breakout_rooms
@@ -134,10 +147,17 @@ def solve(G, s):
         # return tripleClique(G, s)
         d1, b1 = tripleClique(G, s)
         d2, b2 = greedy2(G, s)
-        if utils.calculate_happiness(d1, G) > utils.calculate_happiness(d2, G):
-            return d1, b1
+        d3, b3 = greedy2(G, s)
+        if utils.calculate_happiness(d2, G) > utils.calculate_happiness(d3, G):
+            if utils.calculate_happiness(d2, G) > utils.calculate_happiness(d1, G):
+                return d2, b2
+            else:
+                return d1, b1
         else:
-            return d2, b2
+            if utils.calculate_happiness(d3, G) > utils.calculate_happiness(d1, G):
+                return d3, b3
+            else:
+                return d1, b1
 
 
 """
