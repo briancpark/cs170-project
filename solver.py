@@ -82,8 +82,8 @@ def greedy2(G, s):
         # First room
         ################
         # Generate a random number in 1-length
-        d_temp1 = d.key()
-        d_temp2 = d.key()
+        d_temp1 = list(d.keys())
+        d_temp2 = list(d.keys())
 
         d_temp1 = scrambled(d_temp1)
         d_temp2 = scrambled(d_temp2)
@@ -350,10 +350,10 @@ def partition(collection):
 # For testing a folder of inputs to create a folder of outputs, you can use glob (need to import it)
 if __name__ == '__main__':
     #inputs = glob.glob('inputs/*')
-    inputs = glob.glob('inputs/large/*.in')
+    inputs = glob.glob('inputs/medium/*.in')
     total = 0
     for input_path in inputs:
-        output_path = 'outputs/large/' + \
+        output_path = 'outputs/medium/' + \
             basename(normpath(input_path))[:-3] + '.out'
         G, s = read_input_file(input_path, 100)
         D, k = solve(G, s)
