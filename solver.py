@@ -7,6 +7,7 @@ import parse
 import itertools
 from os.path import basename, normpath
 import glob
+import random
 
 
 """
@@ -66,6 +67,7 @@ def greedy2(G, s):
         # d[1] : [3, 4, 7]
         # d[2] : []
         # Mark item in dictionary to merge
+    breakout_rooms = len(G.nodes)
 
     while(True):
         merge1 = None
@@ -73,15 +75,14 @@ def greedy2(G, s):
         is_merge = False
         # First room
         ################
-        for br1 in d.key():
+        for br1 in random.shuffle(list(d.keys())):
             # Second room
-            for br2 in d.key():
+            for br2 in random.shuffle(list(d.keys())):
                 # Two rooms have to be different
                 if (d[br1] != d[br2]):
                     # Check to see if merge is possible.
-                    temp = []
-                    temp.extend(d[br1], d[br2])
-                    if (utils.calculate_stress_for_room(temp, G) < s / (breakout_rooms - 1)):
+                    temp = d[br1] + d[br2]
+                    if (breakout_rooms != 1 and utils.calculate_stress_for_room(temp, G) < s / (breakout_rooms - 1)):
                         breakout_rooms -= 1
                         # mark the two items to merge
                         merge1 = br1
@@ -99,11 +100,21 @@ def greedy2(G, s):
             #merge_rooms(deletion, merge1, merge2)
             if (merge1 == min(merge1, merge2)):
                 d[merge1] = d[merge1]+d[merge2]
-                del room2
+                del d[merge2]
             else:
                 d[merge2] = d[merge1]+d[merge2]
-                del room1
-    return d, len(breakout_rooms)
+                del d[merge1]
+
+    d_student_rooms = {}
+
+    room_i = 0
+
+    for room in d.values():
+        for i in room:
+            d_student_rooms[i] = room_i    
+        room_i += 1
+
+    return d_student_rooms, breakout_rooms
 
 
 def solve(G, s):
@@ -121,7 +132,12 @@ def solve(G, s):
 
     else:  # For medium/large inputs
         # return tripleClique(G, s)
-        return greedy2(G, s)
+        d1, b1 = tripleClique(G, s)
+        d2, b2 = greedy2(G, s)
+        if utils.calculate_happiness(d1, G) > utils.calculate_happiness(d2, G):
+            return d1, b1
+        else:
+            return d2, b2
 
 
 """
@@ -329,16 +345,12 @@ if __name__ == '__main__':
         except AssertionError as error:
             # brute force and assign everyone to their own breakout room for validity
             G, s = read_input_file(input_path, 100)
-            D = {}
-            i = 0  # the breakout room
-            for node in G.nodes:
-                D[node] = i
-                i += 1
+            D, k = greedy2(G, s)
             write_output_file(D, output_path)
-            print("invalid: " + str(input_path))
+            print("invalid - changed to Greedy: " + str(input_path))
 
         #cost_t = calculate_happiness(T)
-    print(total / len(inputs))
+    #print(total / len(inputs))
 # if __name__ == '__main__':
 #     inputs = glob.glob('inputs/*')
 #     for input_path in inputs:
