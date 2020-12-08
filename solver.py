@@ -86,32 +86,64 @@ def naive(G, s):
     Runtime:
 """
 def tripleClique(G,s):
+    # In this function, we only create rooms of 3.
+    # That is a specific limitation that we've set to decrease computational complexity
+    # It prunes out certain combinations, but it's a decent approximation
+    
+    # This is supposed to handle inputs of 20 and 50.
+    # To avoid the tailcase of dual clique, we add dummy people to turn our group size to
+    # a multiple of 3.
+
+    # If we're dealing with 20.in, we turn it into a group of 21.
+    
+    # This triple case: 
+
+    # Pre-process here
+
+    # double clique -> triple clique -> quad clique
+    # all clique are doubles, triples, or quad
+
+    # for one person's relationship with everyone
+    #   if all of them are bad
+    #   we put this person in their own room
+    #   and recrusively run the problem on the same group excluding this last, but decreasing the breakoutroom size by 1
+    
     if len(G.nodes) == 20:
         limit = s / 7
     else:
         limit = s / 17
 
+    # Initializing all possible cliques
     triple_cliques = list(itertools.combinations(G, 3))
 
+    # initialize room data
     rooms_meta_data = {}
 
+    # Calculate stress and happiness for each combination
     for clique in triple_cliques:
         stress = utils.calculate_stress_for_room(clique, G)
         happiness = utils.calculate_happiness_for_room(clique, G)
         rooms_meta_data[frozenset(clique)] = [stress, happiness]
 
+    # Filter out everything that is not a valid clique
+    # If the stress of a room is above the stress threshhold, then 
+    # that's not a valid solution.
     deletion = []
-
     for key in rooms_meta_data:
-        if rooms_meta_data[key][0] > limit:
+        if rooms_meta_data[key][0] >= limit:
             deletion.append(key)
-        
     for key in deletion:
         del rooms_meta_data[key]
-
+    
+    # Creating a list of all of the people
     nodes = [node for node in G.nodes]
-    combined_set = [] # this contains our answer
-    seen_sets = [] #add seen here
+    
+    # Our Answer: people assigned in BO rooms
+    combined_set = []
+    
+    # Combinations we've seen before
+    # This is used to figure out, what is the remainder for the final dual clique
+    seen_sets = [] 
     i = 0
     #This becomes the triple clique converted list
     for vertices in rooms_meta_data.keys():
@@ -131,19 +163,26 @@ def tripleClique(G,s):
     for frozen_set in combined_set:
         combined_set_list.append(list(frozen_set))
     ### TODO:
+
+
     if len(duo_cliques) > 2:
-        print(len(duo_cliques))
+        #print(len(duo_cliques))
         #if there more than 2 left over, asign them to each room.
         for duo_clique in duo_cliques:
             combined_set_list.append([duo_clique])
     else:
         #Fill it up with duoclique of 2 nodes
         combined_set_list.append(duo_cliques)
-    ### TODO:
-    combined_set_list
-    d = {}
-    i = 0
 
+
+    ### TODO:
+
+    
+    # D is the dictionary of the breakout rooms in which each person is assigned to
+    d = {}
+
+    # Assign each clique into a room
+    i = 0
     for clique in combined_set_list:
         for j in clique:
             d[j] = i
@@ -185,10 +224,10 @@ from os.path import basename, normpath
 # For testing a folder of inputs to create a folder of outputs, you can use glob (need to import it)
 if __name__ == '__main__':
     #inputs = glob.glob('inputs/*')
-    inputs = glob.glob('inputs/medium/*.in')
+    inputs = glob.glob('inputs/large/*.in')
     total = 0
     for input_path in inputs:
-        output_path = 'outputs/medium/' + basename(normpath(input_path))[:-3] + '.out'
+        output_path = 'outputs/large/' + basename(normpath(input_path))[:-3] + '.out'
         G, s = read_input_file(input_path, 100)
         D, k = solve(G, s)
         try:
@@ -197,6 +236,14 @@ if __name__ == '__main__':
             print("success: " + str(input_path))
             total += 1
         except AssertionError as error:
+            #brute force and assign everyone to their own breakout room for validity
+            G, s = read_input_file(input_path, 100)
+            D = {}
+            i = 0 #the breakout room
+            for node in G.nodes:
+                D[node] = i
+                i += 1
+            write_output_file(D, output_path)
             print("invalid: " + str(input_path))
 
         #cost_t = calculate_happiness(T)
