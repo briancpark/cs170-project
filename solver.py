@@ -120,7 +120,8 @@ def solve(G, s):
         return naive(G, s)
 
     else:  # For medium/large inputs
-        return tripleClique(G, s)
+        # return tripleClique(G, s)
+        return greedy2(G, s)
 
 
 """
