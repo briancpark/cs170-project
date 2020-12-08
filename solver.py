@@ -15,6 +15,97 @@ import glob
 """
 
 
+"""
+    All that being said, to obtain an approximate solution, a greedy approach is, probably, the best heuristic: sort the items in decreasing order of size and insert them one by one into the first bin that has room for it. This heuristic is called first-fit decreasing. The main appeal of this heuristic is that we pack the big items first and hope that the little ones fill up the spaces.
+"""
+
+
+def greedyVersion(G, s):
+    # Packing based on stress (fuck happiness, we don't care about that in cal)
+    # As long as we find a working solution, it should result in a higher happiness than putting everyone into their own breakout room
+
+    # Greedy Bin Packing Problem
+    # Sort all edges based on stress
+
+    # Each bin: We add
+    """
+    Sort all edges nlogn n(n-1)/2 edges complete graph
+    pick a random student
+
+    max_heap = store_all_stress edges.
+    no_breakout = 1
+    stressthreahold = stress/no_breakouts
+    new_room_stressthreshold = stress/(no_breakout+1)
+
+    breakout room pointer -> the current breakout room
+    while (there are still students left):
+        for (each student left):
+            if we can add the student without pushing over the threshhold:
+                we add the student
+                take student out of added
+    """
+    return None
+
+
+def greedy2(G, s):
+    """
+        check to see which two breakouts we can combine without exceeding the stress threshhold
+        1. put everyone into their own breakouts
+        2. go through all the breakouts and see if we can merge two together
+        3. we do this until we can no longer 
+
+    """
+    d = {}
+    i = 0
+    for node in G.nodes:  # Place everyone in their own breakout room.
+        d[i] = []
+        d[i].append(node)
+        i += 1
+        # d[room #] : [list contains the students in the breakout room]
+        # d[0] : [1, 2]
+        # d[1] : [3, 4, 7]
+        # d[2] : []
+        # Mark item in dictionary to merge
+
+    while(True):
+        merge1 = None
+        merge2 = None
+        is_merge = False
+        # First room
+        ################
+        for br1 in d.key():
+            # Second room
+            for br2 in d.key():
+                # Two rooms have to be different
+                if (d[br1] != d[br2]):
+                    # Check to see if merge is possible.
+                    temp = []
+                    temp.extend(d[br1], d[br2])
+                    if (utils.calculate_stress_for_room(temp, G) < s / (breakout_rooms - 1)):
+                        breakout_rooms -= 1
+                        # mark the two items to merge
+                        merge1 = br1
+                        merge2 = br2
+                        is_merge = True
+                        break
+            if (is_merge == True):
+                break
+        ################
+        # modify breakout_room to prepare for next iteration
+        # NO MORE POSSIBLE MERGES
+        if is_merge == False:
+            break
+        else:
+            #merge_rooms(deletion, merge1, merge2)
+            if (merge1 == min(merge1, merge2)):
+                d[merge1] = d[merge1]+d[merge2]
+                del room2
+            else:
+                d[merge2] = d[merge1]+d[merge2]
+                del room1
+    return d, len(breakout_rooms)
+
+
 def solve(G, s):
     """
     Args:
@@ -26,20 +117,23 @@ def solve(G, s):
     """
     # If inputs are small, we run our naive method.
     if len(G.nodes) == 10:
-        return naive(G,s)
-    
-    else: #For medium/large inputs
-        return tripleClique(G,s)
-    
+        return naive(G, s)
+
+    else:  # For medium/large inputs
+        return tripleClique(G, s)
+
+
 """
     Brute Force method used for small inputs.
     Main idea: Try all combinations.
     Runtime: Very long.
     Note: This does not work for medium/large.
 """
+
+
 def naive(G, s):
     # If the size is 10, then we use brute force method.
-    
+
     cliques = list(nx.enumerate_all_cliques(G))
     rooms_meta_data = {}
     for clique in cliques:
@@ -68,7 +162,7 @@ def naive(G, s):
         if rem in partioned_sets_data:
             partioned_sets_data.remove(rem)
 
-    partioned_sets_data.sort(key=lambda x:x[2], reverse=True)
+    partioned_sets_data.sort(key=lambda x: x[2], reverse=True)
     optimal = partioned_sets_data[0]
 
     d = {}
@@ -85,18 +179,20 @@ def naive(G, s):
     Main idea: 
     Runtime:
 """
-def tripleClique(G,s):
+
+
+def tripleClique(G, s):
     # In this function, we only create rooms of 3.
     # That is a specific limitation that we've set to decrease computational complexity
     # It prunes out certain combinations, but it's a decent approximation
-    
+
     # This is supposed to handle inputs of 20 and 50.
     # To avoid the tailcase of dual clique, we add dummy people to turn our group size to
     # a multiple of 3.
 
     # If we're dealing with 20.in, we turn it into a group of 21.
-    
-    # This triple case: 
+
+    # This triple case:
 
     # Pre-process here
 
@@ -107,7 +203,7 @@ def tripleClique(G,s):
     #   if all of them are bad
     #   we put this person in their own room
     #   and recrusively run the problem on the same group excluding this last, but decreasing the breakoutroom size by 1
-    
+
     if len(G.nodes) == 20:
         limit = s / 7
     else:
@@ -126,7 +222,7 @@ def tripleClique(G,s):
         rooms_meta_data[frozenset(clique)] = [stress, happiness]
 
     # Filter out everything that is not a valid clique
-    # If the stress of a room is above the stress threshhold, then 
+    # If the stress of a room is above the stress threshhold, then
     # that's not a valid solution.
     deletion = []
     for key in rooms_meta_data:
@@ -134,18 +230,18 @@ def tripleClique(G,s):
             deletion.append(key)
     for key in deletion:
         del rooms_meta_data[key]
-    
+
     # Creating a list of all of the people
     nodes = [node for node in G.nodes]
-    
+
     # Our Answer: people assigned in BO rooms
     combined_set = []
-    
+
     # Combinations we've seen before
     # This is used to figure out, what is the remainder for the final dual clique
-    seen_sets = [] 
+    seen_sets = []
     i = 0
-    #This becomes the triple clique converted list
+    # This becomes the triple clique converted list
     for vertices in rooms_meta_data.keys():
         breakTrue = False
         for vertex in list(vertices):
@@ -162,22 +258,19 @@ def tripleClique(G,s):
     combined_set_list = []
     for frozen_set in combined_set:
         combined_set_list.append(list(frozen_set))
-    ### TODO:
-
+    # TODO:
 
     if len(duo_cliques) > 2:
-        #print(len(duo_cliques))
-        #if there more than 2 left over, asign them to each room.
+        # print(len(duo_cliques))
+        # if there more than 2 left over, asign them to each room.
         for duo_clique in duo_cliques:
             combined_set_list.append([duo_clique])
     else:
-        #Fill it up with duoclique of 2 nodes
+        # Fill it up with duoclique of 2 nodes
         combined_set_list.append(duo_cliques)
 
+    # TODO:
 
-    ### TODO:
-
-    
     # D is the dictionary of the breakout rooms in which each person is assigned to
     d = {}
 
@@ -193,17 +286,16 @@ def tripleClique(G,s):
 
 def partition(collection):
     if len(collection) == 1:
-        yield [ collection ]
+        yield [collection]
         return
 
     first = collection[0]
     for smaller in partition(collection[1:]):
         # insert `first` in each of the subpartition's subsets
         for n, subset in enumerate(smaller):
-            yield smaller[:n] + [[ first ] + subset]  + smaller[n+1:]
-        # put `first` in its own subset 
-        yield [ [ first ] ] + smaller
-
+            yield smaller[:n] + [[first] + subset] + smaller[n+1:]
+        # put `first` in its own subset
+        yield [[first]] + smaller
 
 
 # Here's an example of how to run your solver.
@@ -218,16 +310,14 @@ def partition(collection):
 #     assert is_valid_solution(D, G, s, k)
 #     print("Total Happiness: {}".format(calculate_happiness(D, G)))
 #     write_output_file(D, 'outputs/small-1.out')
-
-import glob
-from os.path import basename, normpath
 # For testing a folder of inputs to create a folder of outputs, you can use glob (need to import it)
 if __name__ == '__main__':
     #inputs = glob.glob('inputs/*')
     inputs = glob.glob('inputs/large/*.in')
     total = 0
     for input_path in inputs:
-        output_path = 'outputs/large/' + basename(normpath(input_path))[:-3] + '.out'
+        output_path = 'outputs/large/' + \
+            basename(normpath(input_path))[:-3] + '.out'
         G, s = read_input_file(input_path, 100)
         D, k = solve(G, s)
         try:
@@ -236,10 +326,10 @@ if __name__ == '__main__':
             print("success: " + str(input_path))
             total += 1
         except AssertionError as error:
-            #brute force and assign everyone to their own breakout room for validity
+            # brute force and assign everyone to their own breakout room for validity
             G, s = read_input_file(input_path, 100)
             D = {}
-            i = 0 #the breakout room
+            i = 0  # the breakout room
             for node in G.nodes:
                 D[node] = i
                 i += 1
