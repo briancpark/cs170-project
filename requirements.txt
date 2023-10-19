@@ -1,5 +1,8 @@
-joblib==1.1.0
-matplotlib==3.4.2
-networkx==2.5.1
-numpy==1.21.4
-tqdm==4.62.3
+joblib>=1.2.0
+matplotlib>=3.8.0
+networkx>=3.1
+numpy>=1.26.0
+tqdm>=4.63.0
+ray>=2.7.0
+black>=23.0.0
+pylint>=3.0.0

@@ -1,19 +1,36 @@
-import networkx as nx
-from parse import read_input_file, write_output_file
-from utils import is_valid_solution, calculate_happiness
-import sys
-import utils
-import parse
+"""
+CS 170 Project Fall 2020
+
+To run: 
+python3 solver.py
+
+To run with Ray enabled:
+python3 solver.py ray
+"""
 import itertools
-from os.path import basename, normpath
-import glob
+import os
 import random
+import glob
+from os.path import basename, normpath
+import ray
+import networkx as nx
 from joblib import Parallel, delayed
 from tqdm import tqdm
+import utils
+from parse import read_input_file, write_output_file
+from utils import is_valid_solution
+
+
+# pylint: disable=invalid-name,too-many-branches,too-many-locals
 
 random.seed(42)
 
+USE_RAY = len(os.sys.argv) > 1 and os.sys.argv[1] == "ray"
+
+
 def scrambled(orig):
+    """Scramble a list"""
+    random.seed(42)  # needs to be reseeded under parallelization
     dest = orig[:]
     random.shuffle(dest)
     return dest
@@ -62,17 +79,16 @@ def greedy2(G, s):
                         merge2 = br2
                         is_merge = True
                         break
-            if is_merge == True:
+            if is_merge:
                 break
-        if is_merge == False:
+        if not is_merge:
             break
+        if merge1 == min(merge1, merge2):
+            d[merge1] = d[merge1] + d[merge2]
+            del d[merge2]
         else:
-            if merge1 == min(merge1, merge2):
-                d[merge1] = d[merge1] + d[merge2]
-                del d[merge2]
-            else:
-                d[merge2] = d[merge1] + d[merge2]
-                del d[merge1]
+            d[merge2] = d[merge1] + d[merge2]
+            del d[merge1]
 
     d_student_rooms = {}
 
@@ -95,24 +111,21 @@ def solve(G, s):
         D: Dictionary mapping for student to breakout room r e.g. {0:2, 1:0, 2:1, 3:2}
         k: Number of breakout rooms
     """
+    # If inputs are small, we run our naive method.
     if len(G.nodes) == 10:
-        # If inputs are small, we run our naive method.
         return naive(G, s)
-    else:
-        # For medium/large inputs
-        d1, b1 = tripleClique(G, s)
-        d2, b2 = greedy2(G, s)
-        d3, b3 = greedy2(G, s)
-        if utils.calculate_happiness(d2, G) > utils.calculate_happiness(d3, G):
-            if utils.calculate_happiness(d2, G) > utils.calculate_happiness(d1, G):
-                return d2, b2
-            else:
-                return d1, b1
-        else:
-            if utils.calculate_happiness(d3, G) > utils.calculate_happiness(d1, G):
-                return d3, b3
-            else:
-                return d1, b1
+
+    # For medium/large inputs
+    d1, b1 = tripleClique(G, s)
+    d2, b2 = greedy2(G, s)
+    d3, b3 = greedy2(G, s)
+    if utils.calculate_happiness(d2, G) > utils.calculate_happiness(d3, G):
+        if utils.calculate_happiness(d2, G) > utils.calculate_happiness(d1, G):
+            return d2, b2
+        return d1, b1
+    if utils.calculate_happiness(d3, G) > utils.calculate_happiness(d1, G):
+        return d3, b3
+    return d1, b1
 
 
 def naive(G, s):
@@ -128,9 +141,9 @@ def naive(G, s):
         stress = utils.calculate_stress_for_room(clique, G)
         happiness = utils.calculate_happiness_for_room(clique, G)
         rooms_meta_data[frozenset(clique)] = [stress, happiness]
-    nodes = [node for node in G.nodes]
+    nodes = list(G.nodes)
     partioned_sets = []
-    for n, p in enumerate(partition(nodes), 1):
+    for _, p in enumerate(partition(nodes), 1):
         partioned_sets.append(sorted(p))
     partioned_sets_data = []
     for sets in partioned_sets:
@@ -186,7 +199,8 @@ def tripleClique(G, s):
     for one person's relationship with everyone
     * if all of them are bad
     * we put this person in their own room
-    * and recrusively run the problem on the same group excluding this last, but decreasing the breakoutroom size by 1
+    * and recrusively run the problem on the same group excluding this last,
+      but decreasing the breakoutroom size by 1
     """
 
     if len(G.nodes) == 20:
@@ -210,14 +224,14 @@ def tripleClique(G, s):
     # If the stress of a room is above the stress threshhold, then
     # that's not a valid solution.
     deletion = []
-    for key in rooms_meta_data:
-        if rooms_meta_data[key][0] >= limit:
+    for key, value in rooms_meta_data.items():
+        if value[0] >= limit:
             deletion.append(key)
     for key in deletion:
         del rooms_meta_data[key]
 
     # Creating a list of all of the people
-    nodes = [node for node in G.nodes]
+    nodes = list(G.nodes)
 
     # Our Answer: people assigned in BO rooms
     combined_set = []
@@ -227,7 +241,7 @@ def tripleClique(G, s):
     seen_sets = []
     i = 0
     # This becomes the triple clique converted list
-    for vertices in rooms_meta_data.keys():
+    for vertices, _ in rooms_meta_data.items():
         breakTrue = False
         for vertex in list(vertices):
             if vertex in seen_sets:
@@ -264,6 +278,7 @@ def tripleClique(G, s):
 
 
 def partition(collection):
+    """Partition a set into all possible subsets"""
     if len(collection) == 1:
         yield [collection]
         return
@@ -277,15 +292,15 @@ def partition(collection):
         yield [[first]] + smaller
 
 
-# Wrapper function to be parallelized
 def solve_wrapper(input_path):
+    """Wrapper function to be parallelized"""
     output_path = "outputs/" + basename(normpath(input_path))[:-3] + ".out"
     G, s = read_input_file(input_path, 100)
     D, k = solve(G, s)
     try:
         assert is_valid_solution(D, G, s, k)
         write_output_file(D, output_path)
-    except AssertionError as error:
+    except AssertionError:
         # brute force and assign everyone to their own breakout room for validity
         G, s = read_input_file(input_path, 100)
         D, k = greedy2(G, s)
@@ -294,6 +309,18 @@ def solve_wrapper(input_path):
 
 if __name__ == "__main__":
     inputs = glob.glob("inputs/*")
-    Parallel(n_jobs=8)(
-        delayed(solve_wrapper)(input_path) for input_path in tqdm(inputs)
-    )
+
+    # Use either a Ray backend or a joblib backend to parallelize the workload
+    if USE_RAY:
+        ray.init()
+
+        solve_wrapper_remote = ray.remote(solve_wrapper)
+        oids = []
+
+        for path in inputs:
+            oids.append(solve_wrapper_remote.remote(path))
+
+        ray.get(oids)
+        ray.shutdown()
+    else:
+        Parallel(n_jobs=-1)(delayed(solve_wrapper)(path) for path in tqdm(inputs))

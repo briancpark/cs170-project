@@ -1,4 +1,5 @@
-import networkx as nx
+# pylint: disable=invalid-name
+
 
 def is_valid_solution(D, G, s, rooms):
     """
@@ -12,7 +13,7 @@ def is_valid_solution(D, G, s, rooms):
     Returns:
         bool: whether D is a valid solution
     """
-    room_budget = s/rooms
+    room_budget = s / rooms
     room_to_student = {}
     for k, v in D.items():
         room_to_student.setdefault(v, []).append(k)
@@ -46,6 +47,7 @@ def calculate_happiness(D, G):
         happiness_total += room_happiness
     return happiness_total
 
+
 def convert_dictionary(room_to_student):
     """
     Converts the dictionary mapping room_to_student to a valid return of the solver
@@ -61,6 +63,7 @@ def convert_dictionary(room_to_student):
             d[student] = room
     return d
 
+
 def calculate_stress_for_room(arr, G):
     """
     Given an array of students in to be placed in a room, calculate stress for the room.
@@ -72,6 +75,7 @@ def calculate_stress_for_room(arr, G):
     """
     H = G.subgraph(arr)
     return H.size("stress")
+
 
 def calculate_happiness_for_room(arr, G):
     """

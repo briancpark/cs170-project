@@ -51,12 +51,19 @@ def read_input_file(path, max_size=None):
             assert 0 <= float(tokens[2]) < 100
             assert 0 <= float(tokens[3]) < 100
 
-        G = nx.parse_edgelist(lines, nodetype=int, data=(("happiness", float),("stress", float),))
+        G = nx.parse_edgelist(
+            lines,
+            nodetype=int,
+            data=(
+                ("happiness", float),
+                ("stress", float),
+            ),
+        )
         G.add_nodes_from(range(n))
 
-        #check completeness and connectivity
+        # check completeness and connectivity
         assert nx.is_connected(G)
-        assert len(G.edges()) == n*(n-1)//2
+        assert len(G.edges()) == n * (n - 1) // 2
 
         if max_size is not None:
             assert len(G) <= max_size
@@ -68,7 +75,7 @@ def write_input_file(G, stress_budget, path):
     with open(path, "w") as fo:
         n = len(G)
         s_total = stress_budget
-        lines = nx.generate_edgelist(G, data=["happiness","stress"])
+        lines = nx.generate_edgelist(G, data=["happiness", "stress"])
         fo.write(str(n) + "\n")
         fo.write(str(s_total) + "\n")
         fo.writelines("\n".join(lines))
@@ -93,12 +100,12 @@ def read_output_file(path, G, s):
         for line in lines:
             tokens = line.split()
             assert len(tokens) == 2
-            #validate node
+            # validate node
             node = int(tokens[0])
             assert tokens[0].isdigit() and 0 <= node < len(G)
             assert node not in nodes
             nodes.add(node)
-            #validate rooms
+            # validate rooms
             room = int(tokens[1])
             assert tokens[0].isdigit() and 0 <= room < len(G)
             rooms.add(room)
