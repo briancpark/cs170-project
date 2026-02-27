@@ -460,6 +460,42 @@ def remap_hint(hint, k):
     return {student: room_map[room] for student, room in hint.items()}
 
 
+def remap_hint_to_k(hint, hint_k, target_k):
+    """
+    Remap a hint with hint_k rooms to work as a hint for target_k rooms.
+    - If target_k == hint_k: direct remap
+    - If target_k > hint_k: keep assignments, extra rooms stay empty
+    - If target_k < hint_k: merge smallest rooms together
+    """
+    if hint is None:
+        return None
+
+    if hint_k == target_k:
+        return remap_hint(hint, target_k)
+
+    if target_k > hint_k:
+        # Just remap to [0, hint_k), extra rooms will be empty
+        return remap_hint(hint, hint_k)
+
+    # target_k < hint_k: merge smallest rooms
+    from collections import Counter
+
+    room_counts = Counter(hint.values())
+    # Sort rooms by size (smallest first) -- merge small rooms into bigger ones
+    sorted_rooms = [r for r, _ in room_counts.most_common()]
+    sorted_rooms.reverse()  # smallest first
+
+    # Map the (hint_k - target_k) smallest rooms into existing bigger rooms
+    room_map = {}
+    for i, room in enumerate(sorted_rooms):
+        if i < target_k:
+            room_map[room] = i
+        else:
+            room_map[room] = i % target_k  # wrap around
+
+    return {student: room_map[room] for student, room in hint.items()}
+
+
 def solve_ortools(G, s):
     """
     OR-Tools solver: tries different k values with CP-SAT and returns the best.
@@ -480,20 +516,20 @@ def solve_ortools(G, s):
     # Configure search range and time limits by input size
     if n <= 10:
         k_values = list(range(1, n + 1))
-        time_per_k = 2
-    elif n <= 20:
-        k_min = max(1, greedy_k - 3)
-        k_max = min(n, greedy_k + 4)
-        k_values = list(range(k_min, k_max + 1))
         time_per_k = 5
+    elif n <= 20:
+        # Try ALL k values for medium -- n=20 is tractable
+        k_values = list(range(1, n + 1))
+        time_per_k = 30
     else:  # n <= 50
-        k_min = max(1, greedy_k - 2)
-        k_max = min(n, greedy_k + 3)
+        k_min = max(1, greedy_k - 6)
+        k_max = min(n, greedy_k + 8)
         k_values = list(range(k_min, k_max + 1))
-        time_per_k = 10
+        time_per_k = 120
 
     for k in k_values:
-        hint = remap_hint(greedy_D, k) if greedy_k == k else None
+        # Always provide a hint -- remap greedy solution to fit k rooms
+        hint = remap_hint_to_k(greedy_D, greedy_k, k)
         D, happiness = solve_for_k(G, s, k, time_per_k, hint)
 
         if D is not None and happiness > best_happiness:
@@ -532,6 +568,13 @@ if __name__ == "__main__":
         "--ray", action="store_true", help="Use Ray backend (original solver only)"
     )
     parser.add_argument(
+        "--size",
+        choices=["small", "medium", "large"],
+        nargs="+",
+        default=None,
+        help="Only solve inputs of these sizes (e.g. --size medium large)",
+    )
+    parser.add_argument(
         "input_file", nargs="?", default=None, help="Single input file to solve"
     )
     args = parser.parse_args()
@@ -546,6 +589,12 @@ if __name__ == "__main__":
             print(f"  Happiness: {happiness:.3f}, Rooms: {k}")
         else:
             inputs = sorted(glob.glob("inputs/*"))
+            if args.size:
+                inputs = [
+                    p
+                    for p in inputs
+                    if any(basename(p).startswith(s + "-") for s in args.size)
+                ]
             print(f"Processing {len(inputs)} inputs with OR-Tools CP-SAT...")
             total_happiness = 0
             for path in tqdm(inputs):
