@@ -1,31 +1,33 @@
 """
 CS 170 Project Fall 2020
 
-To run: 
-python3 solver.py
-
-To run with Ray enabled:
-python3 solver.py ray
+Usage:
+    python solver.py                           # original solver with joblib
+    python solver.py ray                       # original solver with Ray
+    python solver.py --ortools                 # OR-Tools CP-SAT solver (all inputs)
+    python solver.py --ortools inputs/small-1.in  # OR-Tools on a single input
 """
+
+import argparse
 import itertools
 import os
 import random
 import glob
 from os.path import basename, normpath
-import ray
 import networkx as nx
-from joblib import Parallel, delayed
 from tqdm import tqdm
 import utils
 from parse import read_input_file, write_output_file
 from utils import is_valid_solution
 
-
 # pylint: disable=invalid-name,too-many-branches,too-many-locals
 
 random.seed(42)
 
-USE_RAY = len(os.sys.argv) > 1 and os.sys.argv[1] == "ray"
+
+# =============================================================================
+# Original solver
+# =============================================================================
 
 
 def scrambled(orig):
@@ -307,20 +309,266 @@ def solve_wrapper(input_path):
         write_output_file(D, output_path)
 
 
+# =============================================================================
+# OR-Tools CP-SAT solver
+# =============================================================================
+
+SCALE = 1000  # Float -> int scale (input values have <= 3 decimal places)
+
+
+def solve_for_k(G, s, k, time_limit=10, hint=None):
+    """
+    Solve the breakout room problem for a fixed number of rooms k using CP-SAT.
+
+    Args:
+        G: networkx.Graph with 'happiness' and 'stress' edge attributes
+        s: stress budget (S_max)
+        k: number of rooms
+        time_limit: solver time limit in seconds
+        hint: optional dict mapping student -> room (warm start)
+
+    Returns:
+        (D, happiness) or (None, 0) if infeasible
+    """
+    from ortools.sat.python import cp_model
+
+    nodes = sorted(G.nodes)
+
+    # Collect unique pairs (i < j)
+    pairs = []
+    for u, v in G.edges():
+        i, j = (u, v) if u < v else (v, u)
+        pairs.append((i, j))
+    pairs = sorted(set(pairs))
+
+    s_max_scaled = int(round(s * SCALE))
+
+    model = cp_model.CpModel()
+
+    # --- Decision variables: x[i, r] = 1 if student i in room r ---
+    x = {}
+    for i in nodes:
+        for r in range(k):
+            x[i, r] = model.new_bool_var(f"x_{i}_{r}")
+        model.add_exactly_one(x[i, r] for r in range(k))
+
+    # --- Symmetry breaking: first student always in room 0 ---
+    model.add(x[nodes[0], 0] == 1)
+
+    # --- Pair-room indicators: y[i,j,r] = 1 iff both i,j in room r ---
+    y = {}
+    for i, j in pairs:
+        for r in range(k):
+            y[i, j, r] = model.new_bool_var(f"y_{i}_{j}_{r}")
+            model.add(y[i, j, r] <= x[i, r])
+            model.add(y[i, j, r] <= x[j, r])
+            model.add(y[i, j, r] >= x[i, r] + x[j, r] - 1)
+
+    # --- Stress constraints per room ---
+    # k * sum(s_ij * y_ijr) <= S_max  (avoids dividing S_max by k)
+    for r in range(k):
+        model.add(
+            sum(
+                k * int(round(G[i][j]["stress"] * SCALE)) * y[i, j, r] for i, j in pairs
+            )
+            <= s_max_scaled
+        )
+
+    # --- Objective: maximize total happiness ---
+    model.maximize(
+        sum(
+            int(round(G[i][j]["happiness"] * SCALE)) * y[i, j, r]
+            for i, j in pairs
+            for r in range(k)
+        )
+    )
+
+    # --- Warm start from greedy solution ---
+    if hint is not None:
+        for i in nodes:
+            room = hint.get(i)
+            if room is not None:
+                for r in range(k):
+                    model.add_hint(x[i, r], 1 if room == r else 0)
+
+    # --- Solve ---
+    solver = cp_model.CpSolver()
+    solver.parameters.max_time_in_seconds = time_limit
+    solver.parameters.num_workers = os.cpu_count() or 8
+    status = solver.solve(model)
+
+    if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+        D = {}
+        for i in nodes:
+            for r in range(k):
+                if solver.value(x[i, r]):
+                    D[i] = r
+                    break
+        return D, solver.objective_value / SCALE
+
+    return None, 0
+
+
+def greedy_solve(G, s):
+    """
+    Quick greedy baseline: start with everyone alone, merge rooms greedily.
+    Returns (D, k) where D maps student -> room.
+    """
+    from utils import calculate_stress_for_room
+
+    nodes = sorted(G.nodes)
+    rooms = {i: [node] for i, node in enumerate(nodes)}
+    k = len(nodes)
+
+    improved = True
+    while improved:
+        improved = False
+        room_keys = list(rooms.keys())
+        for idx1 in range(len(room_keys)):
+            for idx2 in range(idx1 + 1, len(room_keys)):
+                r1, r2 = room_keys[idx1], room_keys[idx2]
+                if r1 not in rooms or r2 not in rooms:
+                    continue
+                merged = rooms[r1] + rooms[r2]
+                new_k = k - 1
+                if new_k == 0:
+                    continue
+                if calculate_stress_for_room(merged, G) <= s / new_k:
+                    rooms[r1] = merged
+                    del rooms[r2]
+                    k = new_k
+                    improved = True
+                    break
+            if improved:
+                break
+
+    D = {}
+    for room_idx, (_, students) in enumerate(rooms.items()):
+        for student in students:
+            D[student] = room_idx
+    return D, k
+
+
+def remap_hint(hint, k):
+    """Remap a hint dict so all room values are in [0, k)."""
+    if hint is None:
+        return None
+    unique_rooms = sorted(set(hint.values()))
+    if len(unique_rooms) != k:
+        return None
+    room_map = {old: new for new, old in enumerate(unique_rooms)}
+    return {student: room_map[room] for student, room in hint.items()}
+
+
+def solve_ortools(G, s):
+    """
+    OR-Tools solver: tries different k values with CP-SAT and returns the best.
+    Uses greedy solution as warm start hint.
+    """
+    from utils import calculate_happiness
+
+    n = len(G.nodes)
+
+    # Quick greedy baseline
+    greedy_D, greedy_k = greedy_solve(G, s)
+    greedy_happiness = calculate_happiness(greedy_D, G)
+
+    best_D = greedy_D
+    best_k = greedy_k
+    best_happiness = greedy_happiness
+
+    # Configure search range and time limits by input size
+    if n <= 10:
+        k_values = list(range(1, n + 1))
+        time_per_k = 2
+    elif n <= 20:
+        k_min = max(1, greedy_k - 3)
+        k_max = min(n, greedy_k + 4)
+        k_values = list(range(k_min, k_max + 1))
+        time_per_k = 5
+    else:  # n <= 50
+        k_min = max(1, greedy_k - 2)
+        k_max = min(n, greedy_k + 3)
+        k_values = list(range(k_min, k_max + 1))
+        time_per_k = 10
+
+    for k in k_values:
+        hint = remap_hint(greedy_D, k) if greedy_k == k else None
+        D, happiness = solve_for_k(G, s, k, time_per_k, hint)
+
+        if D is not None and happiness > best_happiness:
+            num_rooms = len(set(D.values()))
+            if is_valid_solution(D, G, s, num_rooms):
+                best_D = D
+                best_k = num_rooms
+                best_happiness = happiness
+
+    return best_D, best_k
+
+
+def solve_ortools_wrapper(input_path):
+    """Process a single input file with OR-Tools."""
+    from utils import calculate_happiness
+
+    output_path = "outputs/" + basename(normpath(input_path))[:-3] + ".out"
+    G, s = read_input_file(input_path, 100)
+    D, k = solve_ortools(G, s)
+    assert is_valid_solution(D, G, s, k), f"Invalid solution for {input_path}"
+    happiness = calculate_happiness(D, G)
+    write_output_file(D, output_path)
+    return input_path, happiness, k
+
+
+# =============================================================================
+# Main
+# =============================================================================
+
 if __name__ == "__main__":
-    inputs = glob.glob("inputs/*")
+    parser = argparse.ArgumentParser(description="CS 170 Breakout Room Solver")
+    parser.add_argument(
+        "--ortools", action="store_true", help="Use OR-Tools CP-SAT solver"
+    )
+    parser.add_argument(
+        "--ray", action="store_true", help="Use Ray backend (original solver only)"
+    )
+    parser.add_argument(
+        "input_file", nargs="?", default=None, help="Single input file to solve"
+    )
+    args = parser.parse_args()
 
-    # Use either a Ray backend or a joblib backend to parallelize the workload
-    if USE_RAY:
-        ray.init()
+    os.makedirs("outputs", exist_ok=True)
 
-        solve_wrapper_remote = ray.remote(solve_wrapper)
-        oids = []
-
-        for path in inputs:
-            oids.append(solve_wrapper_remote.remote(path))
-
-        ray.get(oids)
-        ray.shutdown()
+    if args.ortools:
+        # ---- OR-Tools backend ----
+        if args.input_file and os.path.isfile(args.input_file):
+            print(f"Solving {args.input_file} with OR-Tools...")
+            _, happiness, k = solve_ortools_wrapper(args.input_file)
+            print(f"  Happiness: {happiness:.3f}, Rooms: {k}")
+        else:
+            inputs = sorted(glob.glob("inputs/*"))
+            print(f"Processing {len(inputs)} inputs with OR-Tools CP-SAT...")
+            total_happiness = 0
+            for path in tqdm(inputs):
+                try:
+                    _, happiness, k = solve_ortools_wrapper(path)
+                    total_happiness += happiness
+                except Exception as e:
+                    print(f"\nError on {path}: {e}")
+            print(f"\nTotal happiness across all inputs: {total_happiness:.3f}")
     else:
-        Parallel(n_jobs=-1)(delayed(solve_wrapper)(path) for path in tqdm(inputs))
+        # ---- Original backend ----
+        inputs = sorted(glob.glob("inputs/*"))
+
+        if args.ray:
+            import ray
+
+            ray.init()
+            solve_wrapper_remote = ray.remote(solve_wrapper)
+            oids = [solve_wrapper_remote.remote(path) for path in inputs]
+            for _ in tqdm(oids, total=len(oids)):
+                ray.get(_)
+            ray.shutdown()
+        else:
+            from joblib import Parallel, delayed
+
+            Parallel(n_jobs=-1)(delayed(solve_wrapper)(path) for path in tqdm(inputs))
