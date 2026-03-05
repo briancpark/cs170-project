@@ -1,0 +1,70 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{enumitem}
+\usepackage{amsmath}
+\usepackage{hyperref}
+
+\title{CS 170 Project Reflection --- Fall 2020}
+\author{Brian Park, Tony Kam, Jonah Noh, Alfonso Sanchez}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section*{Input Generation}
+
+For the input phase, we designed three inputs (with $n = 10$, $20$, and $50$ students) that we believed would be difficult for other teams' solvers. Our strategy was to construct graphs where the happiness and stress values created tension between grouping students together: pairs with high happiness were given moderately high stress, and pairs with low stress were given low happiness. This made it difficult for greedy approaches to find large, high-happiness rooms without violating the stress budget. We also tuned $S_{\max}$ to be tight enough that solvers would be forced into a non-trivial number of rooms. If given more time, we would have liked to explore adversarial input generation more systematically, for example by running our own solver on candidate inputs and iteratively adjusting edge weights to minimize the happiness achievable.
+
+\section*{Solver Algorithm}
+
+Our solver employed different strategies depending on input size:
+
+\begin{itemize}[nosep]
+    \item \textbf{Small inputs ($n = 10$):} We used a brute-force algorithm that enumerates all possible partitions of the student set. For each partition, we computed the total happiness and verified the stress constraint for every room. This guaranteed an optimal solution and placed us at the top of the leaderboard for small inputs.
+
+    \item \textbf{Medium and large inputs ($n = 20, 50$):} We used two heuristics and took the best result:
+    \begin{enumerate}[nosep]
+        \item \textbf{Triple Clique Algorithm:} We enumerated all $\binom{n}{3}$ triples of students, computed their stress and happiness, and filtered out triples exceeding the per-room stress budget. We then greedily assigned students to rooms of size three, with leftover students placed in smaller rooms. This reduced the combinatorial search space significantly while still producing reasonable groupings.
+
+        \item \textbf{Greedy Room Merging:} We initialized each student in their own room ($k = n$), then iteratively attempted to merge pairs of rooms. A merge was accepted if the combined room's stress did not exceed $S_{\max} / (k - 1)$, the updated budget after reducing the room count by one. The order of merge attempts was randomized (with a fixed seed for reproducibility). This continued until no further merges were possible.
+    \end{enumerate}
+
+    \item \textbf{OR-Tools CP-SAT Solver:} We later formulated the problem as a constraint programming model using Google's OR-Tools CP-SAT solver. For each candidate number of rooms $k$, we introduced binary decision variables $x_{i,r}$ indicating whether student $i$ is in room $r$, and auxiliary variables $y_{i,j,r}$ indicating whether both students $i$ and $j$ are co-located in room $r$. The stress constraint was encoded as:
+    \[
+        k \cdot \sum_{(i,j)} s_{ij} \cdot y_{i,j,r} \leq S_{\max} \quad \forall\, r
+    \]
+    and the objective maximized $\sum_{(i,j),r} h_{ij} \cdot y_{i,j,r}$. We added symmetry-breaking constraints (fixing the first student to room 0) and warm-started the solver with the greedy solution. The solver searched over a range of $k$ values and returned the best feasible solution found within a time limit. This approach was particularly effective for medium inputs, where the CP-SAT solver could explore the space exhaustively, and provided meaningful improvements on large inputs as well.
+\end{itemize}
+
+We selected the solution with the highest total happiness across all strategies. Parallelization was handled with Joblib (and optionally Ray) to process the 717 input files efficiently.
+
+\section*{Other Approaches Considered}
+
+We explored several alternative strategies that ultimately did not make it into our final solver:
+
+\begin{itemize}[nosep]
+    \item \textbf{Multiple Knapsack Reduction:} We attempted to model the problem as a multiple knapsack problem, treating rooms as knapsacks with stress capacity $S_{\max}/k$ and happiness as item value. The key difficulty was that the capacity depends on $k$, which is itself a decision variable, creating a circular dependency.
+
+    \item \textbf{Simulated Annealing:} We considered using simulated annealing to escape local optima in the room assignment space. While promising in theory, we found the triple clique and greedy approaches to be simpler to implement and sufficiently effective for the competition timeline.
+
+    \item \textbf{MST with Happiness/Stress Ratios:} We explored building a maximum spanning tree where edge weights were the ratio $h_{ij}/s_{ij}$, then cutting edges to form clusters. This did not perform well because the ratio metric did not adequately capture the global stress budget constraint.
+\end{itemize}
+
+\section*{Computational Resources}
+
+All computation was performed on our personal machines. We used Python with NetworkX for graph operations, Joblib and Ray for parallelization across the 717 inputs, and Google OR-Tools for the CP-SAT solver backend. No cloud computing services (AWS, GCP) or instructional machines were used. The OR-Tools solver was the most computationally intensive component, with time limits of 5 seconds per $k$ for small inputs, 30 seconds for medium, and 120 seconds for large.
+
+\section*{Future Improvements}
+
+If given more time, we would pursue several directions:
+
+\begin{itemize}[nosep]
+    \item \textbf{Tighter CP-SAT formulations:} Adding valid inequalities or column generation techniques to help the solver prune the search space faster on large inputs.
+    \item \textbf{Hybrid metaheuristics:} Combining the CP-SAT solutions with local search (e.g., simulated annealing or tabu search) to refine solutions beyond the solver's time limit.
+    \item \textbf{Better warm starts:} Using spectral clustering or community detection algorithms on the happiness graph to generate higher-quality initial solutions for the CP-SAT solver.
+    \item \textbf{Longer solver runtimes:} With access to cloud resources, we could afford much longer time limits for the CP-SAT solver, especially on large inputs where the solver often terminated before proving optimality.
+\end{itemize}
+
+Our final ranking was \textbf{9th out of 243 teams}, which we attribute primarily to the brute-force optimality on small inputs and the effectiveness of the CP-SAT formulation on medium and large inputs.
+
+\end{document}

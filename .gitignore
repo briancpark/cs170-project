@@ -4,3 +4,19 @@ __pycache__
 .idea
 venv
 .DS_Store
+
+# LaTeX auxiliary files
+*.aux
+*.log
+reflection.out
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.bbl
+*.blg
+*.nav
+*.snm
+*.vrb
