@@ -92,7 +92,10 @@ def visualize_single(input_path, output_path, save_dir=None):
         width=0.3,
         with_labels=n <= 20,
     )
-    patches = [mpatches.Patch(color=cmap(i % 20), label=f"Room {r}") for i, r in enumerate(room_ids)]
+    patches = [
+        mpatches.Patch(color=cmap(i % 20), label=f"Room {r}")
+        for i, r in enumerate(room_ids)
+    ]
     if k <= 12:
         ax.legend(handles=patches, fontsize=7, loc="upper left", ncol=2)
     ax.set_title("Student Graph (colored by room)")
@@ -101,9 +104,15 @@ def visualize_single(input_path, output_path, save_dir=None):
     ax = axes[0, 1]
     x_pos = np.arange(len(room_ids))
     width = 0.35
-    bars_h = ax.bar(x_pos - width / 2, room_happiness, width, label="Happiness", color="#4CAF50")
-    bars_s = ax.bar(x_pos + width / 2, room_stress, width, label="Stress", color="#F44336")
-    ax.axhline(y=budget_per_room, color="red", linestyle="--", linewidth=1.5, label=f"Stress budget ({budget_per_room:.2f})")
+    ax.bar(x_pos - width / 2, room_happiness, width, label="Happiness", color="#4CAF50")
+    ax.bar(x_pos + width / 2, room_stress, width, label="Stress", color="#F44336")
+    ax.axhline(
+        y=budget_per_room,
+        color="red",
+        linestyle="--",
+        linewidth=1.5,
+        label=f"Stress budget ({budget_per_room:.2f})",
+    )
     ax.set_xticks(x_pos)
     ax.set_xticklabels([f"R{r}" for r in room_ids], fontsize=8)
     ax.set_ylabel("Value")
@@ -112,7 +121,13 @@ def visualize_single(input_path, output_path, save_dir=None):
 
     # --- Panel 3: Room size distribution ---
     ax = axes[1, 0]
-    ax.bar(x_pos, room_sizes, color=[cmap(i % 20) for i in range(len(room_ids))], edgecolor="black", linewidth=0.5)
+    ax.bar(
+        x_pos,
+        room_sizes,
+        color=[cmap(i % 20) for i in range(len(room_ids))],
+        edgecolor="black",
+        linewidth=0.5,
+    )
     ax.set_xticks(x_pos)
     ax.set_xticklabels([f"R{r}" for r in room_ids], fontsize=8)
     ax.set_ylabel("Number of Students")
@@ -122,8 +137,13 @@ def visualize_single(input_path, output_path, save_dir=None):
 
     # --- Panel 4: Stress utilization (% of budget used) ---
     ax = axes[1, 1]
-    utilization = [st / budget_per_room * 100 if budget_per_room > 0 else 0 for st in room_stress]
-    colors = ["#F44336" if u > 100 else "#FF9800" if u > 80 else "#4CAF50" for u in utilization]
+    utilization = [
+        st / budget_per_room * 100 if budget_per_room > 0 else 0 for st in room_stress
+    ]
+    colors = [
+        "#F44336" if u > 100 else "#FF9800" if u > 80 else "#4CAF50"
+        for u in utilization
+    ]
     ax.barh(x_pos, utilization, color=colors, edgecolor="black", linewidth=0.5)
     ax.axvline(x=100, color="red", linestyle="--", linewidth=1.5, label="100% budget")
     ax.set_yticks(x_pos)
@@ -169,19 +189,27 @@ def visualize_summary(input_dir, output_dir, save_dir=None):
             records["large"].append((name, n, k, happiness, s))
 
     fig, axes = plt.subplots(2, 3, figsize=(18, 10))
-    fig.suptitle("CS 170 Breakout Room Solver - Summary Dashboard", fontsize=15, fontweight="bold")
+    fig.suptitle(
+        "CS 170 Breakout Room Solver - Summary Dashboard",
+        fontsize=15,
+        fontweight="bold",
+    )
 
     for col, size in enumerate(["small", "medium", "large"]):
         data = records[size]
         if not data:
             continue
         names, ns, ks, happs, budgets = zip(*data)
-        indices = list(range(len(data)))
 
         # Top row: happiness distribution
         ax = axes[0, col]
         ax.hist(happs, bins=20, color="#4CAF50", edgecolor="black", alpha=0.8)
-        ax.axvline(np.mean(happs), color="red", linestyle="--", label=f"Mean: {np.mean(happs):.1f}")
+        ax.axvline(
+            np.mean(happs),
+            color="red",
+            linestyle="--",
+            label=f"Mean: {np.mean(happs):.1f}",
+        )
         ax.set_title(f"{size.capitalize()} (n={ns[0]}) - Happiness Distribution")
         ax.set_xlabel("Total Happiness")
         ax.set_ylabel("Count")
@@ -191,7 +219,13 @@ def visualize_summary(input_dir, output_dir, save_dir=None):
         ax = axes[1, col]
         room_counts = Counter(ks)
         room_vals = sorted(room_counts.keys())
-        ax.bar(room_vals, [room_counts[v] for v in room_vals], color="#2196F3", edgecolor="black", alpha=0.8)
+        ax.bar(
+            room_vals,
+            [room_counts[v] for v in room_vals],
+            color="#2196F3",
+            edgecolor="black",
+            alpha=0.8,
+        )
         ax.set_title(f"{size.capitalize()} - Rooms (k) Distribution")
         ax.set_xlabel("Number of Rooms (k)")
         ax.set_ylabel("Count")
@@ -209,11 +243,25 @@ def visualize_summary(input_dir, output_dir, save_dir=None):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Visualize CS 170 breakout room outputs")
-    parser.add_argument("output_file", nargs="?", default=None, help="Single output file to visualize")
-    parser.add_argument("--size", choices=["small", "medium", "large"], help="Visualize all outputs of this size")
-    parser.add_argument("--summary", action="store_true", help="Show summary dashboard across all outputs")
-    parser.add_argument("--save", default=None, help="Directory to save figures (instead of showing)")
+    parser = argparse.ArgumentParser(
+        description="Visualize CS 170 breakout room outputs"
+    )
+    parser.add_argument(
+        "output_file", nargs="?", default=None, help="Single output file to visualize"
+    )
+    parser.add_argument(
+        "--size",
+        choices=["small", "medium", "large"],
+        help="Visualize all outputs of this size",
+    )
+    parser.add_argument(
+        "--summary",
+        action="store_true",
+        help="Show summary dashboard across all outputs",
+    )
+    parser.add_argument(
+        "--save", default=None, help="Directory to save figures (instead of showing)"
+    )
     args = parser.parse_args()
 
     input_dir = "inputs"
